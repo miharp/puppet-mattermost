@@ -15,8 +15,11 @@ class mattermost::repo {
       location => 'https://deb.packages.mattermost.com',
       release  => $facts['os']['distro']['codename'],
       repos    => 'main',
+      # The upstream key is ASCII-armored, so the keyring must be named
+      # .asc — apt treats a .gpg extension as binary format and ignores
+      # the key.
       key      => {
-        name   => 'mattermost-archive-keyring.gpg',
+        name   => 'mattermost-archive-keyring.asc',
         source => 'https://deb.packages.mattermost.com/pubkey.gpg',
       },
     }
