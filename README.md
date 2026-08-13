@@ -204,10 +204,11 @@ bundle exec rake strings:generate:reference
 * The apt repository only publishes amd64 packages, so arm64
   Debian-family hosts must use `install_method => 'archive'`. The
   archive method picks the matching amd64/arm64 tarball automatically.
-* On RHEL the module does not configure SELinux, firewalld, or fapolicyd.
-  With SELinux enforcing you will likely need
-  `semanage fcontext -a -t bin_t '/opt/mattermost/bin(/.*)?'` and a
-  firewalld rule for port 8065 — see the upstream deployment guide.
+* On RHEL the module does not configure firewalld (you will need a rule
+  for port 8065) or fapolicyd. Default SELinux enforcing works without
+  any relabeling — verified on EL9 with zero AVC denials — despite the
+  upstream guide's `semanage fcontext` instructions; hardened (e.g.
+  STIG/fapolicyd) environments may still need site-specific policy.
 * Settings managed by Puppet are pinned via environment variables and
   cannot be changed through the System Console (Mattermost greys them
   out); all other settings remain console-editable and persist.
