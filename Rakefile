@@ -20,3 +20,9 @@ begin
 rescue LoadError
   # openvox-strings is only available in the development gem group
 end
+
+begin
+  require 'voxpupuli/release/rake_tasks'
+rescue LoadError
+  # voxpupuli-release is only available in the release gem group
+end

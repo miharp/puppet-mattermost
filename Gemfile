@@ -16,3 +16,7 @@ end
 group :system_tests do
   gem 'voxpupuli-acceptance', '~> 4.4', require: false
 end
+
+group :release do
+  gem 'voxpupuli-release', '~> 5.4', require: false
+end
