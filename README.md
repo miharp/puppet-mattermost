@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/miharp/puppet-mattermost/actions/workflows/ci.yml/badge.svg)](https://github.com/miharp/puppet-mattermost/actions/workflows/ci.yml)
 [![OpenVox compatible](https://img.shields.io/badge/OpenVox-%3E%3D%208.0-orange.svg)](https://voxpupuli.org/openvox/)
-[![License](https://img.shields.io/github/license/miharp/puppet-mattermost.svg)](https://github.com/miharp/puppet-mattermost/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/miharp/puppet-mattermost)](https://github.com/miharp/puppet-mattermost/blob/main/LICENSE)
 
 <!-- Uncomment after the first Forge release:
 [![Puppet Forge](https://img.shields.io/puppetforge/v/miharp/mattermost.svg)](https://forge.puppet.com/modules/miharp/mattermost)
