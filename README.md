@@ -78,13 +78,18 @@ class { 'mattermost':
 This installs a PostgreSQL server with `puppetlabs/postgresql` defaults
 and creates the database and user following the upstream preparation
 guide (UTF8 encoding from `template0`, the Mattermost user as database
-owner — which on PostgreSQL 15+ also grants it the `public` schema). To
-customize the PostgreSQL server itself, declare it before this class;
-`mattermost` only `include`s it:
+owner — which on PostgreSQL 15+ also grants it the `public` schema).
+
+Mattermost requires PostgreSQL 14+, and the module fails at catalog time
+if the version being installed is older. Several platforms default older
+(EL8: 10, EL9: 13), so on the RHEL family declare `postgresql::globals`
+before this class:
 
 ```puppet
-class { 'postgresql::server':
-  version => '16',
+class { 'postgresql::globals':
+  manage_package_repo => true,
+  manage_dnf_module   => true,
+  version             => '16',
 }
 
 class { 'mattermost':
@@ -200,9 +205,17 @@ bundle exec rake strings:generate:reference
 
 ## Limitations
 
-* Ubuntu 20.04/22.04/24.04 and RHEL-family (RHEL, Rocky, AlmaLinux,
-  Oracle Linux) 8/9 only (matching the upstream deployment guide). Debian
-  support would need repository verification first.
+* Ubuntu 22.04/24.04 and RHEL-family (RHEL, Rocky, AlmaLinux,
+  Oracle Linux) 8/9 only. (Ubuntu 20.04 is EOL and its PostgreSQL is
+  older than Mattermost supports.) Debian support would need repository
+  verification first.
+* The PostgreSQL version check guards what the catalog would *install*;
+  it cannot see a wrong-version PostgreSQL already present on the host.
+  dnf module streams reuse the `postgresql-server` package name, so on a
+  host that already has an older PostgreSQL installed, the package
+  resource is satisfied and the old version stays. Remove the old
+  packages and data directory (or upgrade manually) before enabling
+  `manage_database` on such a host.
 * Tarball installs (`install_method => 'archive'`) do not upgrade in
   place: the archive only extracts when `/opt/mattermost/bin/mattermost`
   is absent. To upgrade, follow the [upstream upgrade

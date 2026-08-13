@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variables take precedence, and unmanaged settings now persist when
   changed in the System Console.
 
+- manage_database fails at catalog time when the PostgreSQL version the
+  catalog would install is below Mattermost's required 14 (EL platforms
+  default older), with the postgresql::globals fix in the message.
+
 ### Changed
 
 - Minimum supported Puppet/OpenVox raised from 7.24 to 8.0.
+- Dropped Ubuntu 20.04 from supported platforms (EOL; default
+  PostgreSQL below Mattermost's minimum).

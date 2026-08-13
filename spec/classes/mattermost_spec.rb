@@ -78,6 +78,15 @@ describe 'mattermost' do
       context 'with manage_database => true' do
         let(:params) { super().merge(manage_database: true) }
 
+        # EL platforms default to PostgreSQL < 14, so real usage declares
+        # postgresql::globals first (as the acceptance suite does); the
+        # Ubuntu defaults already satisfy Mattermost's minimum.
+        if os_facts[:os]['family'] == 'RedHat'
+          let(:pre_condition) do
+            "class { 'postgresql::globals': manage_package_repo => true, manage_dnf_module => true, version => '16' }"
+          end
+        end
+
         it { is_expected.to compile.with_all_deps }
         it { is_expected.to contain_class('postgresql::server') }
 
@@ -193,6 +202,14 @@ describe 'mattermost' do
           let(:params) { super().merge(manage_repo: true) }
 
           it { is_expected.to compile.and_raise_error(/no package repository for the RedHat family/) }
+        end
+
+        context 'with manage_database => true and no postgresql::globals' do
+          let(:params) { super().merge(manage_database: true) }
+
+          it "fails on the platform's default PostgreSQL being too old" do
+            expect(subject).to compile.and_raise_error(/below Mattermost's required minimum of 14/)
+          end
         end
       end
     end
