@@ -5,6 +5,10 @@ class mattermost::repo {
   assert_private()
 
   if $mattermost::manage_repo {
+    unless $facts['os']['family'] == 'Debian' {
+      fail("mattermost: Mattermost publishes no package repository for the ${facts['os']['family']} family; use install_method 'archive'")
+    }
+
     include apt
 
     apt::source { 'mattermost':

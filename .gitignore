@@ -7,4 +7,6 @@
 /.vendor/
 /coverage/
 /log/
+/.yardoc/
+/doc/
 .DS_Store

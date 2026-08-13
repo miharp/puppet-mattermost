@@ -2,7 +2,7 @@
   "name": "miharp-mattermost",
   "version": "0.1.0",
   "author": "Mike Harp",
-  "summary": "Installs and configures a Mattermost server from the official apt repository",
+  "summary": "Installs and configures a Mattermost server from the official apt repository or release tarball",
   "license": "Apache-2.0",
   "source": "https://github.com/miharp/puppet-mattermost",
   "project_page": "https://github.com/miharp/puppet-mattermost",
@@ -15,6 +15,14 @@
     {
       "name": "puppetlabs/apt",
       "version_requirement": ">= 9.0.0 < 11.0.0"
+    },
+    {
+      "name": "puppet/archive",
+      "version_requirement": ">= 7.0.0 < 9.0.0"
+    },
+    {
+      "name": "puppetlabs/postgresql",
+      "version_requirement": ">= 9.0.0 < 11.0.0"
     }
   ],
   "operatingsystem_support": [
@@ -25,16 +33,44 @@
         "22.04",
         "24.04"
       ]
+    },
+    {
+      "operatingsystem": "RedHat",
+      "operatingsystemrelease": [
+        "8",
+        "9"
+      ]
+    },
+    {
+      "operatingsystem": "Rocky",
+      "operatingsystemrelease": [
+        "8",
+        "9"
+      ]
+    },
+    {
+      "operatingsystem": "AlmaLinux",
+      "operatingsystemrelease": [
+        "8",
+        "9"
+      ]
+    },
+    {
+      "operatingsystem": "OracleLinux",
+      "operatingsystemrelease": [
+        "8",
+        "9"
+      ]
     }
   ],
   "requirements": [
     {
       "name": "puppet",
-      "version_requirement": ">= 7.24 < 9.0.0"
+      "version_requirement": ">= 8.0.0 < 9.0.0"
     },
     {
       "name": "openvox",
-      "version_requirement": ">= 7.24 < 9.0.0"
+      "version_requirement": ">= 8.0.0 < 9.0.0"
     }
   ]
 }

@@ -1,0 +1,25 @@
+<%- | Stdlib::Absolutepath $install_dir,
+      String[1] $user,
+      String[1] $group,
+      Stdlib::Absolutepath $env_file,
+| -%>
+# This file is managed by Puppet. Local changes will be overwritten.
+[Unit]
+Description=Mattermost
+After=network.target
+
+[Service]
+Type=notify
+EnvironmentFile=-<%= $env_file %>
+ExecStart=<%= $install_dir %>/bin/mattermost
+TimeoutStartSec=3600
+KillMode=mixed
+Restart=always
+RestartSec=10
+WorkingDirectory=<%= $install_dir %>
+User=<%= $user %>
+Group=<%= $group %>
+LimitNOFILE=49152
+
+[Install]
+WantedBy=multi-user.target

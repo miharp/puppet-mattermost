@@ -1,0 +1,8 @@
+---
+# Mattermost publishes no yum/dnf repository, so RHEL-family systems
+# install from the release tarball (see manifests/install.pp). The
+# tarball does not create the mattermost user, so the module manages it.
+mattermost::env_file: '/etc/sysconfig/mattermost'
+mattermost::install_method: 'archive'
+mattermost::manage_repo: false
+mattermost::manage_user: true

@@ -1,4 +1,4 @@
-# @summary Manages the Mattermost config.json
+# @summary Manages Mattermost settings via an environment file
 #
 # @api private
 class mattermost::config {
@@ -29,16 +29,34 @@ class mattermost::config {
     },
   } + $support_settings
 
-  # Mattermost fills in defaults for any key missing from config.json,
-  # so only the settings this module knows about are rendered.
   $config = deep_merge($settings, $mattermost::override_options)
 
-  file { "${mattermost::install_dir}/config/config.json":
+  # Mattermost is configured through MM_* environment variables rather
+  # than a managed config.json: the server rewrites config.json at
+  # startup (persisting defaults and System Console changes into it),
+  # so a Puppet-managed config.json would be reverted on every run and
+  # restart the service each time. Environment variables take
+  # precedence over config.json, and settings without one keep working
+  # through the System Console.
+  $env_lines = sort($config.map |$section, $keys| {
+    $keys.map |$key, $value| {
+      $value_string = $value ? {
+        String  => $value,
+        default => stdlib::to_json($value),
+      }
+      sprintf('MM_%s_%s=%s', $section.upcase, $key.upcase, $value_string)
+    }
+  }.flatten)
+
+  # systemd reads the EnvironmentFile as root before dropping
+  # privileges, so the database password is never readable by the
+  # mattermost user.
+  file { $mattermost::env_file:
     ensure    => file,
-    owner     => 'mattermost',
-    group     => 'mattermost',
+    owner     => 'root',
+    group     => 'root',
     mode      => '0600',
-    content   => Sensitive(stdlib::to_json_pretty($config)),
+    content   => Sensitive("${env_lines.join("\n")}\n"),
     show_diff => false,
   }
 }

@@ -1,6 +1,16 @@
-require 'puppetlabs_spec_helper/rake_tasks'
+# frozen_string_literal: true
+
+require 'voxpupuli/test/rake'
+
+begin
+  require 'voxpupuli/acceptance/rake'
+  task beaker: 'fixtures:prep'
+rescue LoadError
+  # voxpupuli-acceptance is optional (system_tests group)
+end
+
 begin
   require 'puppet-strings/tasks'
 rescue LoadError
-  # puppet-strings is optional (development group)
+  # openvox-strings is optional (development group)
 end

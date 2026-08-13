@@ -1,12 +1,17 @@
+# frozen_string_literal: true
+
 source 'https://rubygems.org'
 
 group :test do
   gem 'openvox', ENV.fetch('OPENVOX_GEM_VERSION', '~> 8.0'), require: false
-  gem 'puppetlabs_spec_helper', '~> 8.0', require: false
-  gem 'rspec-puppet-facts', '~> 5.0', require: false
-  gem 'voxpupuli-puppet-lint-plugins', '~> 5.0', require: false
+  gem 'voxpupuli-rubocop', '~> 5.2', require: false
+  gem 'voxpupuli-test', '~> 14.0', require: false
 end
 
 group :development do
-  gem 'puppet-strings', '~> 4.0', require: false
+  gem 'openvox-strings', '~> 7.0', require: false
+end
+
+group :system_tests do
+  gem 'voxpupuli-acceptance', '~> 4.4', require: false
 end
