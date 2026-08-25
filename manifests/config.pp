@@ -19,6 +19,11 @@ class mattermost::config {
     default => { 'SupportSettings' => { 'SupportEmail' => $mattermost::support_email } },
   }
 
+  $file_settings = $mattermost::effective_data_dir ? {
+    undef   => {},
+    default => { 'FileSettings' => { 'Directory' => $mattermost::effective_data_dir } },
+  }
+
   $settings = {
     'ServiceSettings' => {
       'SiteURL' => $mattermost::site_url,
@@ -27,7 +32,7 @@ class mattermost::config {
       'DriverName' => 'postgres',
       'DataSource' => $data_source,
     },
-  } + $support_settings
+  } + $support_settings + $file_settings
 
   $config = deep_merge($settings, $mattermost::override_options)
 
@@ -38,7 +43,7 @@ class mattermost::config {
   # restart the service each time. Environment variables take
   # precedence over config.json, and settings without one keep working
   # through the System Console.
-  $env_lines = sort($config.map |$section, $keys| {
+  $setting_lines = $config.map |$section, $keys| {
     $keys.map |$key, $value| {
       $value_string = $value ? {
         String  => $value,
@@ -46,7 +51,16 @@ class mattermost::config {
       }
       sprintf('MM_%s_%s=%s', $section.upcase, $key.upcase, $value_string)
     }
-  }.flatten)
+  }.flatten
+
+  # MM_CONFIG is not a config.json setting but the location of the
+  # file itself.
+  $config_lines = $mattermost::effective_config_file ? {
+    undef   => [],
+    default => ["MM_CONFIG=${mattermost::effective_config_file}"],
+  }
+
+  $env_lines = sort($config_lines + $setting_lines)
 
   # systemd reads the EnvironmentFile as root before dropping
   # privileges, so the database password is never readable by the

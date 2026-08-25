@@ -13,6 +13,9 @@ class mattermost::install {
       if $mattermost::manage_repo {
         Class['apt::update'] -> Package[$mattermost::package_name]
       }
+
+      # The package creates the mattermost user.
+      $owner_require = Package[$mattermost::package_name]
     }
     'archive': {
       $version = $mattermost::version
@@ -46,45 +49,82 @@ class mattermost::install {
           home   => $mattermost::install_dir,
           shell  => '/usr/sbin/nologin',
         }
+
+        $owner_require = User[$mattermost::user]
+      } else {
+        $owner_require = undef
       }
 
-      # The tarball's top-level directory is 'mattermost', so it is
-      # extracted into the parent of install_dir.
-      $extract_path = regsubst($mattermost::install_dir, '/[^/]+$', '')
+      # Each version is extracted into its own directory and install_dir
+      # is a symlink to the current one, so raising `version` installs
+      # the new release alongside the old and flips the link (the
+      # previous directory is kept for rollback). config.json and
+      # uploaded files live outside the versioned directory (see
+      # config_file and data_dir) so they survive the switch.
+      $versioned_dir = "${mattermost::install_dir}-${version}"
 
-      archive { "mattermost-${version}.tar.gz":
-        path         => "/var/tmp/mattermost-${version}.tar.gz",
-        source       => $source,
-        extract      => true,
-        extract_path => $extract_path,
-        creates      => "${mattermost::install_dir}/bin/mattermost",
-        cleanup      => true,
-      }
-
-      # The tarball extracts with the packager's uid/gid, and the data
-      # directory is not part of the archive.
-      exec { 'mattermost-install-ownership':
-        command     => "chown -R ${mattermost::user}:${mattermost::group} ${mattermost::install_dir}",
-        path        => ['/bin', '/usr/bin'],
-        refreshonly => true,
-        subscribe   => Archive["mattermost-${version}.tar.gz"],
-      }
-
-      file { "${mattermost::install_dir}/data":
+      file { $versioned_dir:
         ensure  => directory,
         owner   => $mattermost::user,
         group   => $mattermost::group,
-        mode    => '0750',
-        require => Archive["mattermost-${version}.tar.gz"],
+        mode    => '0755',
+        require => $owner_require,
       }
 
-      if $mattermost::manage_user {
-        User[$mattermost::user] -> Exec['mattermost-install-ownership']
-        User[$mattermost::user] -> File["${mattermost::install_dir}/data"]
+      # The tarball's top-level directory is 'mattermost', stripped so
+      # the contents land directly in the versioned directory.
+      archive { "mattermost-${version}.tar.gz":
+        path            => "/var/tmp/mattermost-${version}.tar.gz",
+        source          => $source,
+        extract         => true,
+        extract_path    => $versioned_dir,
+        extract_command => 'tar --strip-components=1 -xzf %s',
+        creates         => "${versioned_dir}/bin/mattermost",
+        cleanup         => true,
+        require         => File[$versioned_dir],
+      }
+
+      # The tarball extracts with the packager's uid/gid, and Mattermost
+      # writes into its install directory (logs, plugins, client).
+      exec { 'mattermost-install-ownership':
+        command     => "chown -R ${mattermost::user}:${mattermost::group} ${versioned_dir}",
+        path        => ['/bin', '/usr/bin'],
+        refreshonly => true,
+        subscribe   => Archive["mattermost-${version}.tar.gz"],
+        require     => $owner_require,
+      }
+
+      file { $mattermost::install_dir:
+        ensure  => link,
+        target  => $versioned_dir,
+        require => Exec['mattermost-install-ownership'],
       }
     }
     default: {
       fail("mattermost: unsupported install_method '${mattermost::install_method}'")
+    }
+  }
+
+  if $mattermost::effective_data_dir =~ NotUndef {
+    file { $mattermost::effective_data_dir:
+      ensure  => directory,
+      owner   => $mattermost::user,
+      group   => $mattermost::group,
+      mode    => '0750',
+      require => $owner_require,
+    }
+  }
+
+  if $mattermost::effective_config_file =~ NotUndef {
+    # Mattermost creates config.json itself when MM_CONFIG points at a
+    # missing file, but not the directory, and it rewrites the file at
+    # startup, so the directory must be writable by the service user.
+    file { dirname($mattermost::effective_config_file):
+      ensure  => directory,
+      owner   => $mattermost::user,
+      group   => $mattermost::group,
+      mode    => '0750',
+      require => $owner_require,
     }
   }
 }

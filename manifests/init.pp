@@ -8,6 +8,14 @@
 # host with `manage_database => true`, or provided externally via the
 # `db_*` parameters.
 #
+# Tarball installs are versioned: each release is extracted into
+# `${install_dir}-${version}` and `install_dir` is a symlink to the
+# current one, so raising `version` upgrades in place (download, link
+# flip, service restart) and the previous directory remains for
+# rollback. config.json and uploaded files are kept outside the
+# versioned directory (`config_file`, `data_dir`) so they survive
+# upgrades.
+#
 # Settings are managed as environment variables (which override
 # config.json) instead of managing config.json itself, because
 # Mattermost rewrites that file at startup. Settings the module does
@@ -56,6 +64,20 @@
 #   this module manages, rendered as MM_* environment variables. Use it
 #   for any Mattermost setting without a dedicated parameter, e.g.
 #   { 'TeamSettings' => { 'SiteName' => 'ACME Chat' } }.
+# @param data_dir
+#   Directory Mattermost stores uploaded files in (FileSettings.Directory).
+#   Created and owned by the Mattermost user when set. Defaults to
+#   `/var/lib/mattermost` for archive installs, so the data lives
+#   outside the versioned install directory and survives upgrades;
+#   undef for package installs, leaving Mattermost's default of
+#   `<install_dir>/data`.
+# @param config_file
+#   Path of Mattermost's config.json, passed to the server as MM_CONFIG.
+#   Mattermost creates and rewrites this file itself; the module only
+#   manages its directory. Defaults to `/etc/mattermost/config.json`
+#   for archive installs, so System Console changes survive upgrades;
+#   undef for package installs, leaving the package's
+#   `<install_dir>/config/config.json`.
 # @param env_file
 #   Path of the environment file the module renders and hooks into the
 #   systemd service.
@@ -80,8 +102,8 @@
 #   Ensure value of the package, e.g. 'installed', 'latest' or a version.
 # @param install_dir
 #   Directory Mattermost is installed into. With install_method
-#   'archive' the tarball's top-level directory is named 'mattermost',
-#   so this must end in '/mattermost'.
+#   'archive' this is a symlink to the versioned directory
+#   `${install_dir}-${version}` the tarball is extracted into.
 # @param manage_user
 #   Whether to manage the Mattermost system user and group. Defaults to
 #   true on the RedHat family (the tarball creates no user; the deb
@@ -109,6 +131,8 @@ class mattermost (
   Boolean $manage_database = false,
   Optional[String[1]] $support_email = undef,
   Hash[String[1], Hash[String[1], Data]] $override_options = {},
+  Optional[Stdlib::Absolutepath] $data_dir = undef,
+  Optional[Stdlib::Absolutepath] $config_file = undef,
   Stdlib::Absolutepath $env_file = '/etc/default/mattermost',
   Enum['package', 'archive'] $install_method = 'package',
   Optional[String[1]] $version = undef,
@@ -125,6 +149,14 @@ class mattermost (
   Stdlib::Ensure::Service $service_ensure = 'running',
   Boolean $service_enable = true,
 ) {
+  if $install_method == 'archive' {
+    $effective_data_dir = pick($data_dir, '/var/lib/mattermost')
+    $effective_config_file = pick($config_file, '/etc/mattermost/config.json')
+  } else {
+    $effective_data_dir = $data_dir
+    $effective_config_file = $config_file
+  }
+
   contain mattermost::repo
   contain mattermost::install
   contain mattermost::database
@@ -135,6 +167,9 @@ class mattermost (
   -> Class['mattermost::install']
   -> Class['mattermost::config']
   ~> Class['mattermost::service']
+
+  # A new package or tarball version must restart the service.
+  Class['mattermost::install'] ~> Class['mattermost::service']
 
   Class['mattermost::database'] -> Class['mattermost::service']
 }

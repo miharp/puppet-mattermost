@@ -26,7 +26,8 @@ guide](https://docs.mattermost.com/deployment-guide/server/deploy-linux.html):
   installs the `mattermost` package
 * on the RHEL family (RHEL, Rocky, AlmaLinux, Oracle Linux 8/9), installs
   from the official release tarball — Mattermost publishes no yum/dnf
-  repository — and manages the `mattermost` system user and systemd unit
+  repository — into a versioned directory, and manages the `mattermost`
+  system user and systemd unit; raising `version` upgrades in place
 * manages Mattermost settings (SiteURL, PostgreSQL DataSource, and
   anything else via `override_options`) as `MM_*` environment variables
   in an environment file loaded by the systemd unit
@@ -46,8 +47,11 @@ a complete deployment.
 
 * On Ubuntu: the apt source `mattermost` and its signing key (disable with
   `manage_repo => false`) and the `mattermost` package
-* On the RHEL family: the release tarball extracted to `/opt/mattermost`,
-  the `mattermost` system user and group, and
+* On the RHEL family: the release tarball extracted to
+  `/opt/mattermost-<version>` with `/opt/mattermost` a symlink to it,
+  the data directory `/var/lib/mattermost` (`data_dir`), the directory
+  of `/etc/mattermost/config.json` (`config_file`, passed to Mattermost
+  as `MM_CONFIG`), the `mattermost` system user and group, and
   `/etc/systemd/system/mattermost.service`
 * An environment file (`/etc/default/mattermost` on Debian,
   `/etc/sysconfig/mattermost` on RHEL) with `MM_*` variables, hooked
@@ -160,7 +164,7 @@ class { 'mattermost':
 }
 ```
 
-### Pinning a version
+### Pinning and upgrading
 
 On Ubuntu, pin through the package:
 
@@ -172,8 +176,42 @@ class { 'mattermost':
 }
 ```
 
-On the RHEL family the `version` parameter *is* the pin. To install from a
-mirror instead of releases.mattermost.com, set `archive_source`.
+On the RHEL family the `version` parameter *is* the pin, and raising it
+upgrades Mattermost: the new tarball is extracted to
+`/opt/mattermost-<new version>`, the `/opt/mattermost` symlink is
+pointed at it, and the service is restarted (Mattermost runs its
+database migrations on start). `config.json` and uploaded files live
+outside the versioned directory (`/etc/mattermost/config.json` and
+`/var/lib/mattermost` by default; see `config_file` and `data_dir`), so
+System Console changes and data carry over. The previous
+`/opt/mattermost-<old version>` is left in place for rollback — lower
+`version` to go back — and can be deleted once you are happy with the
+upgrade. Mattermost only supports [certain upgrade
+paths](https://docs.mattermost.com/deployment-guide/server/upgrade-mattermost.html);
+back up the database before upgrading.
+
+To install from a mirror instead of releases.mattermost.com, set
+`archive_source`.
+
+### Migrating a tarball install from module 0.1.0
+
+Module 0.1.0 extracted the tarball directly to `/opt/mattermost` with
+`config.json` and `data` inside it. Puppet will not replace that
+directory with a symlink (it fails rather than deleting it), so move it
+into the versioned layout once, with the service stopped:
+
+```console
+systemctl stop mattermost
+mv /opt/mattermost /opt/mattermost-11.9.1          # the installed version
+mkdir /etc/mattermost /var/lib/mattermost
+mv /opt/mattermost-11.9.1/config/config.json /etc/mattermost/
+mv /opt/mattermost-11.9.1/data/* /var/lib/mattermost/
+chown -R mattermost:mattermost /etc/mattermost /var/lib/mattermost
+```
+
+The next agent run creates the symlink, adds `MM_CONFIG` and
+`MM_FILESETTINGS_DIRECTORY` to the environment file, and starts the
+service.
 
 ### Tarball installs on other platforms
 
@@ -214,11 +252,11 @@ bundle exec rake strings:generate:reference
   resource is satisfied and the old version stays. Remove the old
   packages and data directory (or upgrade manually) before enabling
   `manage_database` on such a host.
-* Tarball installs (`install_method => 'archive'`) do not upgrade in
-  place: the archive only extracts when `/opt/mattermost/bin/mattermost`
-  is absent. To upgrade, follow the [upstream upgrade
-  procedure](https://docs.mattermost.com/deployment-guide/server/upgrade-mattermost.html)
-  (or remove the old binaries) and raise `version`.
+* Tarball installs keep every `/opt/mattermost-<version>` directory
+  ever installed; the module never deletes old versions. Logs and
+  plugin working directories live inside the versioned directory, so
+  after an upgrade `/opt/mattermost/logs` starts fresh (the old logs
+  remain under the previous version's directory).
 * The apt repository only publishes amd64 packages, so arm64
   Debian-family hosts must use `install_method => 'archive'`. The
   archive method picks the matching amd64/arm64 tarball automatically.
@@ -229,7 +267,8 @@ bundle exec rake strings:generate:reference
   STIG/fapolicyd) environments may still need site-specific policy.
 * Settings managed by Puppet are pinned via environment variables and
   cannot be changed through the System Console (Mattermost greys them
-  out); all other settings remain console-editable and persist.
+  out); all other settings remain console-editable and persist. For
+  tarball installs this includes `FileSettings.Directory` (`data_dir`).
 
 ## Development
 
