@@ -1,6 +1,6 @@
 {
   "name": "miharp-mattermost",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Mike Harp",
   "summary": "Installs and configures a Mattermost server from the official apt repository or release tarball",
   "license": "Apache-2.0",
