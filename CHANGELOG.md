@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `data_dir` and `config_file` parameters. When set, the data directory
+  and the config file's directory are created for the Mattermost user,
+  and Mattermost is pointed at them via `MM_FILESETTINGS_DIRECTORY` and
+  `MM_CONFIG`. They default to `/var/lib/mattermost` and
+  `/etc/mattermost/config.json` for archive installs and are unset for
+  package installs.
+- Acceptance coverage of an in-place tarball upgrade (11.9.1 → 11.10.1)
+  on the RedHat family.
+
+### Changed
+
+- **Breaking for existing tarball installs:** the archive install method
+  now extracts each release into `<install_dir>-<version>` and manages
+  `install_dir` (`/opt/mattermost`) as a symlink to it, so raising
+  `version` upgrades Mattermost in place (new directory, link flip,
+  service restart) and the previous version stays for rollback. Hosts
+  installed by 0.1.0 have a real `/opt/mattermost` directory, which
+  Puppet will refuse to replace; see "Migrating a tarball install from
+  module 0.1.0" in the README for the one-off move.
+- A changed package or tarball now restarts the service.
+
 ## [0.1.0] - 2026-08-13
 
 ### Added

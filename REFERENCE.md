@@ -30,6 +30,14 @@ systemd service. The PostgreSQL database can be managed on the same
 host with `manage_database => true`, or provided externally via the
 `db_*` parameters.
 
+Tarball installs are versioned: each release is extracted into
+`${install_dir}-${version}` and `install_dir` is a symlink to the
+current one, so raising `version` upgrades in place (download, link
+flip, service restart) and the previous directory remains for
+rollback. config.json and uploaded files are kept outside the
+versioned directory (`config_file`, `data_dir`) so they survive
+upgrades.
+
 Settings are managed as environment variables (which override
 config.json) instead of managing config.json itself, because
 Mattermost rewrites that file at startup. Settings the module does
@@ -70,6 +78,8 @@ The following parameters are available in the `mattermost` class:
 * [`manage_database`](#-mattermost--manage_database)
 * [`support_email`](#-mattermost--support_email)
 * [`override_options`](#-mattermost--override_options)
+* [`data_dir`](#-mattermost--data_dir)
+* [`config_file`](#-mattermost--config_file)
 * [`env_file`](#-mattermost--env_file)
 * [`install_method`](#-mattermost--install_method)
 * [`version`](#-mattermost--version)
@@ -172,6 +182,32 @@ for any Mattermost setting without a dedicated parameter, e.g.
 
 Default value: `{}`
 
+##### <a name="-mattermost--data_dir"></a>`data_dir`
+
+Data type: `Optional[Stdlib::Absolutepath]`
+
+Directory Mattermost stores uploaded files in (FileSettings.Directory).
+Created and owned by the Mattermost user when set. Defaults to
+`/var/lib/mattermost` for archive installs, so the data lives
+outside the versioned install directory and survives upgrades;
+undef for package installs, leaving Mattermost's default of
+`<install_dir>/data`.
+
+Default value: `undef`
+
+##### <a name="-mattermost--config_file"></a>`config_file`
+
+Data type: `Optional[Stdlib::Absolutepath]`
+
+Path of Mattermost's config.json, passed to the server as MM_CONFIG.
+Mattermost creates and rewrites this file itself; the module only
+manages its directory. Defaults to `/etc/mattermost/config.json`
+for archive installs, so System Console changes survive upgrades;
+undef for package installs, leaving the package's
+`<install_dir>/config/config.json`.
+
+Default value: `undef`
+
 ##### <a name="-mattermost--env_file"></a>`env_file`
 
 Data type: `Stdlib::Absolutepath`
@@ -241,8 +277,8 @@ Default value: `'installed'`
 Data type: `Stdlib::Absolutepath`
 
 Directory Mattermost is installed into. With install_method
-'archive' the tarball's top-level directory is named 'mattermost',
-so this must end in '/mattermost'.
+'archive' this is a symlink to the versioned directory
+`${install_dir}-${version}` the tarball is extracted into.
 
 Default value: `'/opt/mattermost'`
 

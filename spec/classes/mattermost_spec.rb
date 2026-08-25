@@ -123,6 +123,55 @@ describe 'mattermost' do
             .that_notifies('Service[mattermost]')
         end
 
+        it 'leaves config.json and the data directory to the package' do
+          expect(config_env).not_to include('MM_CONFIG=')
+          expect(config_env).not_to include('MM_FILESETTINGS_DIRECTORY=')
+          expect(subject).not_to contain_file('/var/lib/mattermost')
+          expect(subject).not_to contain_file('/etc/mattermost')
+        end
+
+        context 'with data_dir and config_file' do
+          let(:params) { super().merge(data_dir: '/srv/mattermost', config_file: '/etc/mattermost/config.json') }
+
+          it do
+            expect(subject).to contain_file('/srv/mattermost')
+              .with_ensure('directory')
+              .with_owner('mattermost')
+              .that_requires('Package[mattermost]')
+          end
+
+          it do
+            expect(subject).to contain_file('/etc/mattermost')
+              .with_ensure('directory')
+              .that_requires('Package[mattermost]')
+          end
+
+          it do
+            expect(config_env).to include('MM_FILESETTINGS_DIRECTORY=/srv/mattermost',
+                                          'MM_CONFIG=/etc/mattermost/config.json')
+          end
+        end
+
+        context 'with install_method => archive' do
+          let(:params) do
+            super().merge(install_method: 'archive', manage_repo: false, manage_user: true, version: '11.9.1')
+          end
+
+          it { is_expected.to compile.with_all_deps }
+          it { is_expected.not_to contain_package('mattermost') }
+          it { is_expected.to contain_user('mattermost') }
+          it { is_expected.to contain_archive('mattermost-11.9.1.tar.gz').with_extract_path('/opt/mattermost-11.9.1') }
+
+          it do
+            expect(subject).to contain_file('/opt/mattermost')
+              .with_ensure('link')
+              .with_target('/opt/mattermost-11.9.1')
+          end
+
+          it { is_expected.to contain_file('/var/lib/mattermost').with_ensure('directory') }
+          it { is_expected.to contain_file('/etc/systemd/system/mattermost.service') }
+        end
+
         context 'with manage_repo => false' do
           let(:params) { super().merge(manage_repo: false) }
 
@@ -134,11 +183,22 @@ describe 'mattermost' do
         it { is_expected.not_to contain_package('mattermost') }
         it { is_expected.not_to contain_file('/etc/systemd/system/mattermost.service.d/puppet.conf') }
 
-        it do
+        it 'extracts the tarball into a versioned directory' do
           expect(subject).to contain_archive('mattermost-11.9.1.tar.gz')
-            .with_source('https://releases.mattermost.com/11.9.1/mattermost-11.9.1-linux-amd64.tar.gz')
-            .with_extract_path('/opt')
-            .with_creates('/opt/mattermost/bin/mattermost')
+            .with(source: 'https://releases.mattermost.com/11.9.1/mattermost-11.9.1-linux-amd64.tar.gz',
+                  extract_path: '/opt/mattermost-11.9.1',
+                  extract_command: 'tar --strip-components=1 -xzf %s',
+                  creates: '/opt/mattermost-11.9.1/bin/mattermost')
+        end
+
+        it { is_expected.to contain_archive('mattermost-11.9.1.tar.gz').that_requires('File[/opt/mattermost-11.9.1]') }
+
+        it do
+          expect(subject).to contain_file('/opt/mattermost-11.9.1')
+            .with_ensure('directory')
+            .with_owner('mattermost')
+            .with_group('mattermost')
+            .that_requires('User[mattermost]')
         end
 
         it { is_expected.to contain_group('mattermost').with_system(true) }
@@ -146,15 +206,70 @@ describe 'mattermost' do
 
         it do
           expect(subject).to contain_exec('mattermost-install-ownership')
+            .with_command('chown -R mattermost:mattermost /opt/mattermost-11.9.1')
             .with_refreshonly(true)
             .that_subscribes_to('Archive[mattermost-11.9.1.tar.gz]')
         end
 
-        it do
-          expect(subject).to contain_file('/opt/mattermost/data')
-            .with_ensure('directory')
-            .with_owner('mattermost')
-            .with_group('mattermost')
+        it 'points install_dir at the versioned directory once it is owned' do
+          expect(subject).to contain_file('/opt/mattermost')
+            .with_ensure('link')
+            .with_target('/opt/mattermost-11.9.1')
+            .that_requires('Exec[mattermost-install-ownership]')
+        end
+
+        it 'restarts the service when the install changes' do
+          expect(subject).to contain_class('mattermost::install').that_notifies('Class[mattermost::service]')
+        end
+
+        it { is_expected.not_to contain_file('/opt/mattermost/data') }
+
+        it 'keeps uploads outside the versioned directory' do
+          expect(subject).to contain_file('/var/lib/mattermost')
+            .with(ensure: 'directory', owner: 'mattermost', group: 'mattermost', mode: '0750')
+            .that_requires('User[mattermost]')
+          expect(config_env).to include('MM_FILESETTINGS_DIRECTORY=/var/lib/mattermost')
+        end
+
+        it 'keeps config.json outside the versioned directory' do
+          expect(subject).to contain_file('/etc/mattermost')
+            .with(ensure: 'directory', owner: 'mattermost', group: 'mattermost', mode: '0750')
+            .that_requires('User[mattermost]')
+          expect(config_env).to include('MM_CONFIG=/etc/mattermost/config.json')
+        end
+
+        context 'with a different version' do
+          let(:params) { super().merge(version: '11.10.1') }
+
+          it do
+            expect(subject).to contain_archive('mattermost-11.10.1.tar.gz')
+              .with_extract_path('/opt/mattermost-11.10.1')
+          end
+
+          it { is_expected.to contain_file('/opt/mattermost').with_target('/opt/mattermost-11.10.1') }
+          it { is_expected.not_to contain_archive('mattermost-11.9.1.tar.gz') }
+        end
+
+        context 'with data_dir and config_file' do
+          let(:params) { super().merge(data_dir: '/srv/mattermost/data', config_file: '/srv/mattermost/config.json') }
+
+          it { is_expected.to contain_file('/srv/mattermost/data').with_ensure('directory') }
+          it { is_expected.to contain_file('/srv/mattermost').with_ensure('directory') }
+          it { is_expected.not_to contain_file('/var/lib/mattermost') }
+          it { is_expected.not_to contain_file('/etc/mattermost') }
+
+          it do
+            expect(config_env).to include('MM_FILESETTINGS_DIRECTORY=/srv/mattermost/data',
+                                          'MM_CONFIG=/srv/mattermost/config.json')
+          end
+        end
+
+        context 'with manage_user => false' do
+          let(:params) { super().merge(manage_user: false) }
+
+          it { is_expected.to compile.with_all_deps }
+          it { is_expected.not_to contain_user('mattermost') }
+          it { is_expected.to contain_file('/opt/mattermost-11.9.1').with_owner('mattermost') }
         end
 
         it 'manages the systemd unit' do
