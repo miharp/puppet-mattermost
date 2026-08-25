@@ -197,21 +197,25 @@ To install from a mirror instead of releases.mattermost.com, set
 
 Module 0.1.0 extracted the tarball directly to `/opt/mattermost` with
 `config.json` and `data` inside it. Puppet will not replace that
-directory with a symlink (it fails rather than deleting it), so move it
-into the versioned layout once, with the service stopped:
+directory with a symlink: the first agent run with the new module
+extracts `/opt/mattermost-<version>` but then fails on
+`File[/opt/mattermost]` ("Not removing directory; use 'force' to
+override"), leaving the old installation running. Move the old tree
+aside once, with the service stopped:
 
 ```console
 systemctl stop mattermost
-mv /opt/mattermost /opt/mattermost-11.9.1          # the installed version
-mkdir /etc/mattermost /var/lib/mattermost
-mv /opt/mattermost-11.9.1/config/config.json /etc/mattermost/
-mv /opt/mattermost-11.9.1/data/* /var/lib/mattermost/
+mkdir -p /etc/mattermost /var/lib/mattermost
+mv /opt/mattermost/config/config.json /etc/mattermost/
+cp -a /opt/mattermost/data/. /var/lib/mattermost/
 chown -R mattermost:mattermost /etc/mattermost /var/lib/mattermost
+mv /opt/mattermost /opt/mattermost.old
 ```
 
-The next agent run creates the symlink, adds `MM_CONFIG` and
-`MM_FILESETTINGS_DIRECTORY` to the environment file, and starts the
-service.
+The next agent run creates the symlink (extracting the tarball first if
+it has not already), adds `MM_CONFIG` and `MM_FILESETTINGS_DIRECTORY`
+to the environment file, and starts the service. Delete
+`/opt/mattermost.old` once you are satisfied.
 
 ### Tarball installs on other platforms
 
