@@ -339,4 +339,3 @@ Data type: `Boolean`
 Whether the service starts on boot.
 
 Default value: `true`
-
